@@ -40,3 +40,4 @@ go build -o internetometer main.go
 - `--save log.jsonl`: Сохранить результат в лог-файл.
 - `--prometheus`: Вывод в формате метрик Prometheus.
 - `--concurrency 4`: Количество параллельных потоков.
+- `--stream`: Вывод без анимации — по одной строке в секунду с прогрессом замера. Удобно для виджетов (conky, waybar и т.п.) и non-TTY окружений.

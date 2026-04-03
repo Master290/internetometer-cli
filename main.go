@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/Master290/internetometer-cli/pkg/yandex"
 )
+
+const phaseDuration = 8.0 // seconds per download/upload phase
 
 func main() {
 	showIP := flag.Bool("ip", false, "Show IPv4 and IPv6 addresses")
@@ -23,10 +27,17 @@ func main() {
 	prometheus := flag.Bool("prometheus", false, "Output results in Prometheus metrics format")
 	useTUI := flag.Bool("tui", false, "Use interactive TUI for progress")
 	timeout := flag.Duration("timeout", 60*time.Second, "Timeout for the entire operation")
+	stream := flag.Bool("stream", false, "Print one progress line per second (for non-TTY / widget use)")
 
 	flag.Parse()
 
-	if !*showIP && !*showSpeed && !*showFull && !*prometheus && !*asJSON {
+	// stream implies all + no TUI
+	if *stream {
+		*showFull = true
+		*useTUI = false
+	}
+
+	if !*showIP && !*showSpeed && !*showFull && !*prometheus && !*asJSON && !*stream {
 		*useTUI = true
 	}
 
@@ -48,6 +59,99 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
+	// -----------------------------------------------------------------------
+	// Stream mode: print progress lines every second, final result at the end
+	// -----------------------------------------------------------------------
+	if *stream {
+		// 1. Gather info up-front and print immediately
+		ipv4, _ := client.GetIPv4()
+		ipv6, _ := client.GetIPv6()
+		region, _ := client.GetRegion()
+		isp, _ := client.GetISP()
+
+		fmt.Printf("IPv4:   %s\n", ipv4)
+		if ipv6 != "" {
+			fmt.Printf("IPv6:   %s\n", ipv6)
+		}
+		if region != "" {
+			fmt.Printf("Region: %s\n", region)
+		}
+		if isp != nil && isp.Name != "" {
+			fmt.Printf("ISP:    %s (AS%s)\n", isp.Name, isp.ASN)
+		}
+		fmt.Println()
+
+		// 2. Shared state updated by progress callback
+		var mu sync.Mutex
+		var curPhase string
+		var curMbps float64
+		var curPct float64
+		var phaseStart time.Time
+
+		progressFn := func(r yandex.ProgressReport) {
+			mu.Lock()
+			defer mu.Unlock()
+
+			phase := "Download"
+			if !r.IsDownload {
+				phase = "Upload"
+			}
+
+			// phase switch or first call
+			if phase != curPhase || phaseStart.IsZero() {
+				curPhase = phase
+				phaseStart = time.Now()
+				curMbps = 0
+				curPct = 0
+			}
+
+			elapsed := time.Since(phaseStart).Seconds()
+			if elapsed > 0.05 {
+				curMbps = float64(r.Bytes) * 8 / (elapsed * 1e6)
+				curPct = math.Min(elapsed/phaseDuration*100, 100)
+			}
+		}
+
+		// 3. Ticker prints one line per second
+		ticker := time.NewTicker(time.Second)
+		done := make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-ticker.C:
+					mu.Lock()
+					phase := curPhase
+					mbps := curMbps
+					pct := curPct
+					mu.Unlock()
+					if phase != "" {
+						fmt.Printf("Measuring %s: %.2f Mbps (%.0f%%)\n", phase, mbps, pct)
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
+
+		// 4. Run speed test
+		speed, err := client.RunSpeedTest(ctx, progressFn)
+		ticker.Stop()
+		close(done)
+
+		fmt.Println()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Speed test failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Download: %.2f Mbps\n", speed.DownloadMbps)
+		fmt.Printf("Upload:   %.2f Mbps\n", speed.UploadMbps)
+		fmt.Printf("Latency:  %d ms\n", speed.Latency.Milliseconds())
+		return
+	}
+
+	// -----------------------------------------------------------------------
+	// Non-stream modes (original behaviour)
+	// -----------------------------------------------------------------------
 	results := make(map[string]interface{})
 
 	if *showIP || *showFull {
