@@ -20,6 +20,7 @@
 ```bash
 git clone https://github.com/Master290/internetometer-cli.git
 cd internetometer-cli
+go mod tidy
 go build -o internetometer main.go
 ```
 
