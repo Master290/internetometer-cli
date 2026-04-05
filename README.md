@@ -12,7 +12,10 @@
   - JSON
   - Экспорт метрик Prometheus
   - JSONL
-
+## [Bash версия](https://github.com/Master290/internetometer-cli-sh/tree/main):
+```bash
+curl -fsSL https://speed.dev.tatar | bash
+```
 ## Установка
 
 Убедитесь, что у вас установлен [Go](https://go.dev/doc/install).
