@@ -43,3 +43,4 @@ go build -o internetometer main.go
 - `--save log.jsonl`: Сохранить результат в лог-файл.
 - `--prometheus`: Вывод в формате метрик Prometheus.
 - `--concurrency 4`: Количество параллельных потоков.
+- `--interface tun0`: Привязать исходящие соединения к указанному сетевому интерфейсу (использует `SO_BINDTODEVICE`, только Linux).

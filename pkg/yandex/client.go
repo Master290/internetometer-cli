@@ -14,6 +14,7 @@ type Config struct {
 	Timeout     time.Duration
 	Language    string // "ru" or "en"
 	Concurrency int
+	Interface   string // bind outgoing connections to this network interface (SO_BINDTODEVICE, Linux only)
 }
 
 type Client struct {
@@ -37,11 +38,14 @@ func NewClient(cfg *Config) *Client {
 		cfg.Concurrency = 4
 	}
 
+	httpClient := &http.Client{Timeout: cfg.Timeout}
+	if t := interfaceTransport(cfg.Interface); t != nil {
+		httpClient.Transport = t
+	}
+
 	return &Client{
-		httpClient: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		config: cfg,
+		httpClient: httpClient,
+		config:     cfg,
 	}
 }
 
