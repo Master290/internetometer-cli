@@ -49,7 +49,7 @@ func main() {
 	go func() {
 		ticker := time.NewTicker(delay)
 		for {
-			log.Println("Measuging Internet connectivity parameters.")
+			log.Println("Measuring Internet connectivity parameters.")
 
 			speed, err := client.RunSpeedTest(context.TODO(), nil)
 			if err != nil {
