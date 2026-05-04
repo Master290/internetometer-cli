@@ -30,6 +30,20 @@ go build -o internetometer ./cmd/cli/main.go
 go build -o prom-exporter ./cmd/prom/exporter.go
 ```
 
+## Установка (Arch Linux / AUR)
+
+Если вы используете Arch Linux, вы можете установить пакеты напрямую из AUR:
+
+**CLI версия:**
+```bash
+yay -S internetometer-cli
+```
+
+**Prometheus Exporter:**
+```bash
+yay -S internetometer-exporter
+```
+
 ## Быстрый старт
 
 ### CLI (Консольная версия)
