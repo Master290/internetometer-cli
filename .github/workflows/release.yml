@@ -1,1 +1,58 @@
-# to be written
+name: build&release binaries
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  release:
+    name: build&release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: cli
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          BINARY_NAME="internetometer-${{ matrix.os }}-${{ matrix.arch }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then BINARY_NAME+=".exe"; fi
+          go build -o "dist/$BINARY_NAME" ./cmd/cli/main.go
+
+      - name: export
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: |
+          BINARY_NAME="prom-exporter-${{ matrix.os }}-${{ matrix.arch }}"
+          if [ "${{ matrix.os }}" = "windows" ]; then BINARY_NAME+=".exe"; fi
+          go build -o "dist/$BINARY_NAME" ./cmd/prom/exporter.go
+
+      - name: upl release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
