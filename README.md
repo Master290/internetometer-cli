@@ -24,14 +24,23 @@ curl -fsSL https://speed.dev.tatar | bash
 git clone https://github.com/Master290/internetometer-cli.git
 cd internetometer-cli
 go mod tidy
-go build -o internetometer main.go
+# CLI
+go build -o internetometer ./cmd/cli/main.go
+# экспортер
+go build -o prom-exporter ./cmd/prom/exporter.go
 ```
 
 ## Быстрый старт
 
-Просто запустите программу без флагов:
+### CLI (Консольная версия)
 ```bash
 ./internetometer
+```
+
+### Экспортер Prometheus (Фоновый режим)[*](https://github.com/Master290/internetometer-cli/pull/5)
+Запуск HTTP-сервера с метриками (по умолчанию на :9112):
+```bash
+./prom-exporter --delay 1h
 ```
 
 ### Основные флаги
