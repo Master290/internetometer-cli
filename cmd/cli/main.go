@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"runtime"
 	"time"
@@ -119,6 +120,7 @@ func main() {
 			results["download_mbps"] = speed.DownloadMbps
 			results["upload_mbps"] = speed.UploadMbps
 			results["latency_ms"] = speed.Latency.Milliseconds()
+			results["test_url"] = speed.TestURL
 		}
 	}
 
@@ -184,7 +186,15 @@ func printText(res map[string]interface{}) {
 	}
 
 	if v, ok := res["region"]; ok {
-		fmt.Printf("Region:   %v\n", v)
+		if testURL, ok := res["test_url"].(string); ok && testURL != "" {
+			displayURL := testURL
+			if u, err := url.Parse(testURL); err == nil {
+				displayURL = u.Host
+			}
+			fmt.Printf("Region:   %v (%v)\n", v, displayURL)
+		} else {
+			fmt.Printf("Region:   %v\n", v)
+		}
 	}
 	if v, ok := res["isp"]; ok {
 		fmt.Printf("ISP:      %v (AS%v)\n", v, res["asn"])
