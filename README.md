@@ -1,7 +1,8 @@
 # internetometer-cli > Яндекс Интернетометр в терминале
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) 
 
 Неофициальный CLI для Яндекс Интернетометр (yandex.ru/internet) 
+![скриншот](https://i.imgur.com/gz0yhdw.png)
 
   - Определение IPv4 и IPv6.
   - Определение региона, провайдера и номера автономной системы (ISP/ASN).
