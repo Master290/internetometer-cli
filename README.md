@@ -4,19 +4,16 @@
 Неофициальный CLI для Яндекс Интернетометр (yandex.ru/internet) 
 
   - Определение IPv4 и IPv6.
-  - Определение региона.
-  - Определение провайдера и номера автономной системы (ISP/ASN).
+  - Определение региона, провайдера и номера автономной системы (ISP/ASN).
   - Точное измерение задержки (Ping).
 - **Различные форматы вывода**:
   - Читаемый текстовый формат
   - JSON
   - Экспорт метрик Prometheus
   - JSONL
-## [Bash версия](https://github.com/Master290/internetometer-cli-sh/tree/main):
-```bash
-curl -fsSL https://speed.dev.tatar | bash
-```
+
 ## Установка
+> Готовые бинарники лежат в [релизах](https://github.com/Master290/internetometer-cli/releases)
 
 Убедитесь, что у вас установлен [Go](https://go.dev/doc/install).
 
