@@ -3,6 +3,7 @@ package yandex
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -27,6 +28,7 @@ type model struct {
 	ipv4   string
 	ipv6   string
 	region string
+	testURL string
 	isp    string
 
 	downloadPrg progress.Model
@@ -63,7 +65,15 @@ func (m model) Init() tea.Cmd {
 				ipv6, _ := m.client.GetIPv6()
 				region, _ := m.client.GetRegion()
 				isp, _ := m.client.GetISP()
-				return initialInfoMsg{ipv4, ipv6, region, isp}
+				var testURL string
+				probes, err := m.client.GetProbes()
+				if err == nil {
+					target := m.client.SelectDownloadProbe(probes)
+					if target != nil {
+						testURL = target.URL
+					}
+				}
+				return initialInfoMsg{ipv4, ipv6, region, isp, testURL}
 			}
 		}(),
 	)
@@ -72,6 +82,7 @@ func (m model) Init() tea.Cmd {
 type initialInfoMsg struct {
 	ipv4, ipv6, region string
 	isp                *ISPInfo
+	testURL            string
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -89,8 +100,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.ipv4 = msg.ipv4
 		m.ipv6 = msg.ipv6
 		m.region = msg.region
+		m.testURL = msg.testURL
 		if msg.isp != nil {
-			m.isp = msg.isp.Name
+			if msg.isp.ASN != 0 && msg.isp.Name != fmt.Sprintf("AS%d", msg.isp.ASN) {
+				m.isp = fmt.Sprintf("%s (AS%d)", msg.isp.Name, msg.isp.ASN)
+			} else {
+				m.isp = msg.isp.Name
+			}
 		}
 		m.phase = "download"
 		m.phaseStartTime = time.Now()
@@ -123,6 +139,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.downloadMbps = msg.res.DownloadMbps
 			m.uploadMbps = msg.res.UploadMbps
 			m.latency = fmt.Sprintf("%d ms", msg.res.Latency.Milliseconds())
+			m.testURL = msg.res.TestURL
 		}
 		m.phase = "done"
 		return m, tea.Quit
@@ -190,7 +207,15 @@ func (m model) View() string {
 	if m.ipv6 != "" {
 		s.WriteString(fmt.Sprintf("IPv6:   %s\n", m.ipv6))
 	}
-	s.WriteString(fmt.Sprintf("Region: %s\n", m.region))
+	if m.testURL != "" {
+		displayURL := m.testURL
+		if u, err := url.Parse(m.testURL); err == nil {
+			displayURL = u.Host
+		}
+		s.WriteString(fmt.Sprintf("Region: %s (%s)\n", m.region, displayURL))
+	} else {
+		s.WriteString(fmt.Sprintf("Region: %s\n", m.region))
+	}
 	s.WriteString(fmt.Sprintf("ISP:    %s\n", m.isp))
 	s.WriteString("\n")
 
