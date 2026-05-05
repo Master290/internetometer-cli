@@ -9,6 +9,8 @@ jobs:
   release:
     name: build&release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
