@@ -23,6 +23,7 @@ type SpeedResult struct {
 	DownloadMbps float64
 	UploadMbps   float64
 	Latency      time.Duration
+	TestURL      string
 }
 
 type ProgressReport struct {
@@ -31,6 +32,33 @@ type ProgressReport struct {
 }
 
 type ProgressFunc func(ProgressReport)
+
+func (c *Client) SelectDownloadProbe(probes *ProbesResponse) *Probe {
+	if probes == nil || len(probes.Download.Probes) == 0 {
+		return nil
+	}
+	var targetProbe *Probe
+	for i := range probes.Download.Probes {
+		p := &probes.Download.Probes[i]
+		if targetProbe == nil || (p.URL != "" && !regexp.MustCompile(`100kb`).MatchString(p.URL)) {
+			targetProbe = p
+			if regexp.MustCompile(`50mb`).MatchString(p.URL) {
+				break
+			}
+		}
+	}
+	if targetProbe == nil {
+		targetProbe = &probes.Download.Probes[0]
+	}
+	return targetProbe
+}
+
+func (c *Client) SelectUploadURL(probes *ProbesResponse) string {
+	if probes == nil || len(probes.Upload.Probes) == 0 {
+		return ""
+	}
+	return probes.Upload.Probes[0].URL
+}
 
 func (c *Client) RunSpeedTest(ctx context.Context, progress ProgressFunc) (*SpeedResult, error) {
 	probes, err := c.GetProbes()
@@ -49,21 +77,9 @@ func (c *Client) RunSpeedTest(ctx context.Context, progress ProgressFunc) (*Spee
 	}
 
 	// download
-	if len(probes.Download.Probes) > 0 {
-		var targetProbe *Probe
-		for i := range probes.Download.Probes {
-			p := &probes.Download.Probes[i]
-			if targetProbe == nil || (p.URL != "" && !regexp.MustCompile(`100kb`).MatchString(p.URL)) {
-				targetProbe = p
-				if regexp.MustCompile(`50mb`).MatchString(p.URL) {
-					break
-				}
-			}
-		}
-		if targetProbe == nil {
-			targetProbe = &probes.Download.Probes[0]
-		}
-
+	targetProbe := c.SelectDownloadProbe(probes)
+	if targetProbe != nil {
+		result.TestURL = targetProbe.URL
 		c.lastTestStart = time.Now()
 		bitsPerSec, err := c.measureDownloadParallel(ctx, targetProbe.URL, c.config.Concurrency, progress)
 		if err == nil {
@@ -72,14 +88,12 @@ func (c *Client) RunSpeedTest(ctx context.Context, progress ProgressFunc) (*Spee
 	}
 
 	// upload
-	if len(probes.Upload.Probes) > 0 {
-		targetURL := probes.Upload.Probes[0].URL
-		if targetURL != "" {
-			c.lastTestStart = time.Now()
-			bitsPerSec, err := c.measureUploadParallel(ctx, targetURL, 50*1024*1024, c.config.Concurrency, progress)
-			if err == nil {
-				result.UploadMbps = bitsPerSec / 1000000.0
-			}
+	targetURL := c.SelectUploadURL(probes)
+	if targetURL != "" {
+		c.lastTestStart = time.Now()
+		bitsPerSec, err := c.measureUploadParallel(ctx, targetURL, 50*1024*1024, c.config.Concurrency, progress)
+		if err == nil {
+			result.UploadMbps = bitsPerSec / 1000000.0
 		}
 	}
 
