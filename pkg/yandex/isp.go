@@ -1,10 +1,8 @@
 package yandex
 
 import (
-	"fmt"
-	"io"
+	"encoding/json"
 	"net/http"
-	"regexp"
 )
 
 type ISPInfo struct {
@@ -13,11 +11,10 @@ type ISPInfo struct {
 }
 
 func (c *Client) GetISP() (*ISPInfo, error) {
-	req, err := http.NewRequest("GET", "https://yandex.ru/internet", nil)
+	req, err := http.NewRequest("GET", "http://ip-api.com/json/", nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", c.config.UserAgent)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -25,27 +22,29 @@ func (c *Client) GetISP() (*ISPInfo, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
+	var data struct {
+		ISP string `json:"isp"`
+		AS  string `json:"as"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
 		return nil, err
 	}
 
-	html := string(body)
-
-	info := &ISPInfo{}
-
-	asnRe := regexp.MustCompile(`"asn":\[(\d+)\]`)
-	if match := asnRe.FindStringSubmatch(html); len(match) > 1 {
-		fmt.Sscanf(match[1], "%d", &info.ASN)
+	info := &ISPInfo{
+		Name: data.ISP,
 	}
-
-	ispRe := regexp.MustCompile(`"operatorName":"([^"]*)"`)
-	if match := ispRe.FindStringSubmatch(html); len(match) > 1 {
-		info.Name = match[1]
-	}
-
-	if info.Name == "" && info.ASN != 0 {
-		info.Name = fmt.Sprintf("AS%d", info.ASN)
+	
+	if len(data.AS) > 2 && data.AS[:2] == "AS" {
+		var asn int
+		for i := 2; i < len(data.AS); i++ {
+			if data.AS[i] >= '0' && data.AS[i] <= '9' {
+				asn = asn*10 + int(data.AS[i]-'0')
+			} else {
+				break
+			}
+		}
+		info.ASN = asn
 	}
 
 	return info, nil
