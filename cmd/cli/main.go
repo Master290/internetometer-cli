@@ -24,6 +24,7 @@ func main() {
 	prometheus := flag.Bool("prometheus", false, "Output results in Prometheus metrics format")
 	useTUI := flag.Bool("tui", false, "Use interactive TUI for progress")
 	timeout := flag.Duration("timeout", 60*time.Second, "Timeout for the entire operation")
+	iface := flag.String("interface", "", "Network interface to bind to (e.g., eth0, wlan0)")
 
 	flag.Parse()
 
@@ -35,6 +36,7 @@ func main() {
 		Timeout:     *timeout,
 		Language:    *lang,
 		Concurrency: *concurrency,
+		Interface:   *iface,
 	})
 
 	if *useTUI {
