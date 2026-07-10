@@ -39,6 +39,7 @@ type model struct {
 	uploadMbps   float64
 	curMbps      float64
 	latency      string
+	jitter       string
 
 	phase          string
 	phaseStartTime time.Time
@@ -138,7 +139,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.downloadMbps = msg.res.DownloadMbps
 			m.uploadMbps = msg.res.UploadMbps
-			m.latency = fmt.Sprintf("%d ms", msg.res.Latency.Milliseconds())
+			m.latency = fmt.Sprintf("%.2f ms", float64(msg.res.Latency.Nanoseconds())/1e6)
+			m.jitter = fmt.Sprintf("%.2f ms", float64(msg.res.Jitter.Nanoseconds())/1e6)
 			m.testURL = msg.res.TestURL
 		}
 		m.phase = "done"
@@ -233,6 +235,7 @@ func (m model) View() string {
 		s.WriteString(fmt.Sprintf("\nDownload: %.2f Mbps", m.downloadMbps))
 		s.WriteString(fmt.Sprintf("\nUpload:   %.2f Mbps", m.uploadMbps))
 		s.WriteString(fmt.Sprintf("\nLatency:  %s", m.latency))
+		s.WriteString(fmt.Sprintf("\nJitter:   %s", m.jitter))
 	}
 
 	s.WriteString("\n\n" + infoStyle.Render("Press q or Ctrl+C to quit"))

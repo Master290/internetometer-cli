@@ -11,6 +11,7 @@ type internetometer struct {
 	sync.RWMutex
 
 	pingMetric     *prometheus.Desc
+	jitterMetric   *prometheus.Desc
 	uploadMetric   *prometheus.Desc
 	downloadMetric *prometheus.Desc
 
@@ -25,7 +26,13 @@ func (i *internetometer) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(
 		i.pingMetric,
 		prometheus.GaugeValue,
-		float64(i.res.Latency.Milliseconds()),
+		float64(i.res.Latency.Nanoseconds())/1e6,
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		i.jitterMetric,
+		prometheus.GaugeValue,
+		float64(i.res.Jitter.Nanoseconds())/1e6,
 	)
 
 	ch <- prometheus.MustNewConstMetric(
@@ -44,6 +51,7 @@ func (i *internetometer) Collect(ch chan<- prometheus.Metric) {
 // Describe implements [prometheus.Collector].
 func (i *internetometer) Describe(ch chan<- *prometheus.Desc) {
 	ch <- i.pingMetric
+	ch <- i.jitterMetric
 	ch <- i.uploadMetric
 	ch <- i.downloadMetric
 }
@@ -60,6 +68,11 @@ func New() *internetometer {
 		pingMetric: prometheus.NewDesc(
 			"internetometer_ping",
 			"Latency (ms)",
+			nil, nil,
+		),
+		jitterMetric: prometheus.NewDesc(
+			"internetometer_jitter",
+			"Jitter (ms)",
 			nil, nil,
 		),
 		uploadMetric: prometheus.NewDesc(

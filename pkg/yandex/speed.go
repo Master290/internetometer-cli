@@ -23,6 +23,7 @@ type SpeedResult struct {
 	DownloadMbps float64
 	UploadMbps   float64
 	Latency      time.Duration
+	Jitter       time.Duration
 	TestURL      string
 }
 
@@ -70,9 +71,10 @@ func (c *Client) RunSpeedTest(ctx context.Context, progress ProgressFunc) (*Spee
 
 	// latency
 	if len(probes.Latency.Probes) > 0 {
-		latency, err := c.measureLatency(ctx, probes.Latency.Probes)
+		latency, jitter, err := c.measureLatency(ctx, probes.Latency.Probes)
 		if err == nil {
 			result.Latency = latency
+			result.Jitter = jitter
 		}
 	}
 
@@ -100,42 +102,90 @@ func (c *Client) RunSpeedTest(ctx context.Context, progress ProgressFunc) (*Spee
 	return result, nil
 }
 
-func (c *Client) measureLatency(ctx context.Context, probes []Probe) (time.Duration, error) {
-	const count = 3
-	var min time.Duration = 10 * time.Second
-	found := false
+func (c *Client) measureLatency(ctx context.Context, probes []Probe) (time.Duration, time.Duration, error) {
+	var bestURL string
+	var minDur time.Duration = 10 * time.Second
+
+	for _, p := range probes {
+		if p.URL == "" {
+			continue
+		}
+		start := time.Now()
+		req, err := http.NewRequestWithContext(ctx, "GET", p.URL, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", c.config.UserAgent)
+		req.Header.Set("Referer", "https://yandex.ru/internet")
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode == http.StatusOK {
+			dur := time.Since(start)
+			if dur < minDur {
+				minDur = dur
+				bestURL = p.URL
+			}
+		}
+		resp.Body.Close()
+	}
+
+	if bestURL == "" {
+		return 0, 0, fmt.Errorf("no successful latency probes")
+	}
+
+	const count = 5
+	var measurements []time.Duration
 
 	for i := 0; i < count; i++ {
-		for _, p := range probes {
-			if p.URL == "" {
-				continue
-			}
-			start := time.Now()
-			req, err := http.NewRequestWithContext(ctx, "GET", p.URL, nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Set("User-Agent", c.config.UserAgent)
-			req.Header.Set("Referer", "https://yandex.ru/internet")
+		start := time.Now()
+		req, err := http.NewRequestWithContext(ctx, "GET", bestURL, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("User-Agent", c.config.UserAgent)
+		req.Header.Set("Referer", "https://yandex.ru/internet")
 
-			resp, err := c.httpClient.Do(req)
-			if err != nil {
-				continue
-			}
-			if resp.StatusCode == http.StatusOK {
-				dur := time.Since(start)
-				if dur < min {
-					min = dur
-				}
-				found = true
-			}
-			resp.Body.Close()
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode == http.StatusOK {
+			dur := time.Since(start)
+			measurements = append(measurements, dur)
+		}
+		resp.Body.Close()
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if len(measurements) == 0 {
+		return minDur, 0, nil
+	}
+
+	finalMin := minDur
+	for _, m := range measurements {
+		if m < finalMin {
+			finalMin = m
 		}
 	}
-	if !found {
-		return 0, fmt.Errorf("no successful latency probes")
+
+	var jitter time.Duration
+	if len(measurements) > 1 {
+		var sumDiffs time.Duration
+		for i := 0; i < len(measurements)-1; i++ {
+			diff := measurements[i+1] - measurements[i]
+			if diff < 0 {
+				diff = -diff
+			}
+			sumDiffs += diff
+		}
+		jitter = sumDiffs / time.Duration(len(measurements)-1)
 	}
-	return min, nil
+
+	return finalMin, jitter, nil
 }
 
 func (c *Client) measureDownload(ctx context.Context, url string, progress ProgressFunc) (float64, error) {

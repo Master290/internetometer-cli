@@ -119,7 +119,8 @@ func main() {
 		} else {
 			results["download_mbps"] = speed.DownloadMbps
 			results["upload_mbps"] = speed.UploadMbps
-			results["latency_ms"] = speed.Latency.Milliseconds()
+			results["latency_ms"] = float64(speed.Latency.Nanoseconds()) / 1e6
+			results["jitter_ms"] = float64(speed.Jitter.Nanoseconds()) / 1e6
 			results["test_url"] = speed.TestURL
 		}
 	}
@@ -146,7 +147,11 @@ func main() {
 
 		fmt.Println("# HELP internetometer_latency_ms Network latency in milliseconds")
 		fmt.Println("# TYPE internetometer_latency_ms gauge")
-		fmt.Printf("internetometer_latency_ms%s %v\n", labels, results["latency_ms"])
+		fmt.Printf("internetometer_latency_ms%s %.2f\n", labels, results["latency_ms"])
+
+		fmt.Println("# HELP internetometer_jitter_ms Network latency jitter in milliseconds")
+		fmt.Println("# TYPE internetometer_jitter_ms gauge")
+		fmt.Printf("internetometer_jitter_ms%s %.2f\n", labels, results["jitter_ms"])
 		return
 	}
 
@@ -207,7 +212,10 @@ func printText(res map[string]interface{}) {
 		fmt.Printf("Upload:   %.2f Mbps\n", v)
 	}
 	if v, ok := res["latency_ms"]; ok {
-		fmt.Printf("Latency:  %v ms\n", v)
+		fmt.Printf("Latency:  %.2f ms\n", v)
+	}
+	if v, ok := res["jitter_ms"]; ok {
+		fmt.Printf("Jitter:   %.2f ms\n", v)
 	}
 
 	if v, ok := res["os"]; ok {
